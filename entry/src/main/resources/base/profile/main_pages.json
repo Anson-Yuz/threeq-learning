@@ -1,0 +1,12 @@
+{
+  "src": [
+    "pages/HomePage",
+    "pages/CourseSpacePage",
+    "pages/MindModelPage",
+    "pages/DebatePage",
+    "pages/QuizPage",
+    "pages/ReportPage",
+    "pages/ProfilePage",
+    "pages/MaterialUploadPage"
+  ]
+}

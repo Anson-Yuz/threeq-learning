@@ -1,0 +1,50 @@
+# === HarmonyOS / DevEco Studio ===
+
+# Build outputs
+build/
+**/build/
+*.hap
+*.app
+
+# Hvigor
+.hvigor/
+hvigor-logs/
+
+# IDE
+.idea/
+.deveco/
+*.iml
+workspace.xml
+
+# Cache
+.cache/
+*.cache
+*.cache.json
+*.protoBin
+
+# Local config
+local.properties
+*.local
+
+# Node
+node_modules/
+oh_modules/
+package-lock.json
+
+# OS
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Logs
+*.log
+
+# Config backups
+config-backup-*/
+
+# Signing (NEVER commit)
+*.p12
+*.pem
+*.cer
+*.keystore
+signing/

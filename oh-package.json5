@@ -1,0 +1,10 @@
+{
+  "modelVersion": "5.0.0",
+  "name": "threeq-studymachine",
+  "version": "1.0.0",
+  "description": "三问高效学习机 ThreeQ Learning Machine",
+  "main": "",
+  "author": "Student",
+  "license": "MIT",
+  "dependencies": {}
+}

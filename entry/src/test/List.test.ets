@@ -1,0 +1,5 @@
+{
+  "tests": [
+    "CourseStore.test.ets"
+  ]
+}

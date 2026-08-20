@@ -1,0 +1,70 @@
+name: Optimization Task
+description: Track a ThreeQStudyMachine HarmonyOS upgrade task
+title: "[Upgrade] "
+labels:
+  - status:needs-triage
+body:
+  - type: textarea
+    id: background
+    attributes:
+      label: Background
+      description: Why this upgrade is needed.
+    validations:
+      required: true
+  - type: textarea
+    id: scope
+    attributes:
+      label: Scope
+      description: What is included in this task.
+    validations:
+      required: true
+  - type: textarea
+    id: non-goals
+    attributes:
+      label: Non-goals
+      description: What should not be changed in this task.
+    validations:
+      required: false
+  - type: textarea
+    id: harmonyos
+    attributes:
+      label: HarmonyOS constraints
+      description: ArkUI components, ArkTS requirements, permissions, storage, or routing constraints.
+    validations:
+      required: true
+  - type: textarea
+    id: ui
+    attributes:
+      label: UI requirements
+      description: Google-style UI requirements, page states, responsive behavior, screenshots needed.
+    validations:
+      required: false
+  - type: textarea
+    id: acceptance
+    attributes:
+      label: Acceptance criteria
+      description: Concrete checks required before closing this task.
+      value: |
+        - [ ] ArkUI native implementation
+        - [ ] ArkTS types are explicit
+        - [ ] Loading, empty, error, offline states handled
+        - [ ] Unit/UI tests updated
+        - [ ] User or developer docs updated
+        - [ ] Optimization log posted
+    validations:
+      required: true
+  - type: textarea
+    id: validation
+    attributes:
+      label: Validation plan
+      description: Commands, tests, screenshots, device checks.
+    validations:
+      required: true
+  - type: textarea
+    id: risks
+    attributes:
+      label: Risks and rollback
+      description: Known risks and rollback plan.
+    validations:
+      required: false
+

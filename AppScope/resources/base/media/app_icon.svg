@@ -1,0 +1,5 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 120 120" width="120" height="120">
+  <rect width="120" height="120" rx="24" fill="#1A73E8"/>
+  <text x="60" y="50" text-anchor="middle" fill="white" font-size="36" font-weight="bold">3Q</text>
+  <text x="60" y="78" text-anchor="middle" fill="white" font-size="14">学习机</text>
+</svg>
