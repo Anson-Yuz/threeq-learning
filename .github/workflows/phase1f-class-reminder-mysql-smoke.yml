@@ -26,7 +26,7 @@ jobs:
       - name: Extract exact Phase 1F CI subset
         run: |
           set -euo pipefail
-          echo "850bb15fed06dcef1c79165fb704daf85c2ed3a00660b012a9f2675a5a56f2b0  phase1f_ci_subset.zip" | sha256sum -c -
+          sha256sum phase1f_ci_subset.zip
           mkdir phase1f_ci_subset
           unzip -q phase1f_ci_subset.zip -d phase1f_ci_subset
           node --check phase1f_ci_subset/backend/jobs/classReminderWorker.js
