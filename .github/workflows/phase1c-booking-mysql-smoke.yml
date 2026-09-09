@@ -22,13 +22,23 @@ jobs:
           --health-retries=30
     steps:
       - uses: actions/checkout@v4
-      - name: Extract Phase 1C booking test subset
-        run: unzip -q phase1c_ci_subset.zip
+
+      - name: Reconstruct exact Phase 1C test subset
+        run: |
+          set -euo pipefail
+          cat phase1c_payload_parts/00 phase1c_payload_parts/01 phase1c_payload_parts/02 phase1c_payload_parts/03 phase1c_payload_parts/04 > phase1c_ci_payload.txt
+          echo "768f389856920f3218395143311ed6683341aba30fa9804fe656ab21b5a974e2  phase1c_ci_payload.txt" | sha256sum -c -
+          base64 -d phase1c_ci_payload.txt > phase1c_ci_subset.zip
+          echo "a50769d6b11a684279a4f3739b4e8b11dd22b1f230fa28bf513f8ef36e491fb4  phase1c_ci_subset.zip" | sha256sum -c -
+          unzip -t phase1c_ci_subset.zip
+          unzip -q phase1c_ci_subset.zip
+
       - name: Install mysql2 test dependency
         working-directory: phase1c_ci_subset
         run: |
           npm init -y >/dev/null 2>&1
           npm install --no-audit --no-fund mysql2@3.11.5
+
       - name: Apply frozen schema and run real MySQL booking concurrency smoke
         env:
           MYSQL_CONTAINER_ID: ${{ job.services.mysql.id }}
@@ -38,19 +48,22 @@ jobs:
           DB_PASSWORD: root
           DB_NAME: hubeier_phase1c_smoke
         run: |
-          set -o pipefail
+          set -euo pipefail
           docker exec -i "$MYSQL_CONTAINER_ID" mysql -uroot -proot -e "CREATE DATABASE IF NOT EXISTS hubeier_phase1c_smoke CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci;"
           docker exec -i "$MYSQL_CONTAINER_ID" mysql -uroot -proot hubeier_phase1c_smoke < phase1c_ci_subset/database/schema.sql
           (
             cd phase1c_ci_subset
-            node tests/phase1c_booking_mysql_smoke.js
+            NODE_PATH="$PWD/node_modules" node tests/phase1c_booking_mysql_smoke.js
           ) | tee phase1c_booking_mysql_smoke.result.txt
+
       - name: Upload Phase 1C MySQL evidence
         if: always()
         uses: actions/upload-artifact@v4
         with:
           name: phase1c-booking-mysql-smoke-evidence
           path: |
+            phase1c_ci_payload.txt
+            phase1c_ci_subset.zip
             phase1c_ci_subset/backend/booking/bookingRepository.js
             phase1c_ci_subset/backend/booking/bookingService.js
             phase1c_ci_subset/backend/booking/formationService.js
