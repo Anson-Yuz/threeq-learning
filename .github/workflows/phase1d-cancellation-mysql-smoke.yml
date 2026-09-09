@@ -33,6 +33,31 @@ jobs:
           unzip -q phase1c_ci_subset.zip
           echo "e9f10294d257d89f41aec9f97999e30a48835383487aedf3a63d5889f12e6d20  phase1d_overlay.zip" | sha256sum -c -
           unzip -oq phase1d_overlay.zip -d phase1c_ci_subset
+          python3 - <<'PY'
+          from pathlib import Path
+          p = Path("phase1c_ci_subset/tests/phase1d_cancellation_mysql_smoke.js")
+          s = p.read_text()
+          old = "function resultCode(settled) { return settled.status === 'rejected' && settled.reason ? settled.reason.code : null; }\n"
+          add = """function resultCode(settled) { return settled.status === 'rejected' && settled.reason ? settled.reason.code : null; }
+function stableStringify(value) {
+  if (Array.isArray(value)) return `[${value.map(stableStringify).join(',')}]`;
+  if (value && typeof value === 'object') {
+    return `{${Object.keys(value).sort().map(key => `${JSON.stringify(key)}:${stableStringify(value[key])}`).join(',')}}`;
+  }
+  return JSON.stringify(value);
+}
+"""
+          if old not in s:
+              raise SystemExit("resultCode patch anchor missing")
+          s = s.replace(old, add, 1)
+          old_cmp = "new Set(hRace.map(x => JSON.stringify(x.value.payload))).size === 1"
+          new_cmp = "new Set(hRace.map(x => stableStringify(x.value.payload))).size === 1"
+          if old_cmp not in s:
+              raise SystemExit("payload comparison patch anchor missing")
+          s = s.replace(old_cmp, new_cmp, 1)
+          p.write_text(s)
+          PY
+          echo "09304f856a7d8fa9333eb0c00fa809cccf0e944a11491315fbcd70bb319e1b74  phase1c_ci_subset/tests/phase1d_cancellation_mysql_smoke.js" | sha256sum -c -
           node --check phase1c_ci_subset/backend/booking/cancellationService.js
           node --check phase1c_ci_subset/backend/booking/cancellationRepository.js
           node --check phase1c_ci_subset/tests/phase1d_cancellation_mysql_smoke.js
