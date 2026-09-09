@@ -1,9 +1,9 @@
-name: Phase1C Booking MySQL Smoke
+name: Phase1C1 Delayed Formation MySQL Smoke
 
 on:
   push:
     branches:
-      - phase1c-booking-mysql-smoke
+      - phase1c1-delayed-formation-smoke2
 
 jobs:
   booking-mysql-smoke:
@@ -23,7 +23,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Reconstruct exact Phase 1C test subset
+      - name: Reconstruct exact Phase 1C baseline subset
         run: |
           set -euo pipefail
           cat phase1c_payload_parts/00 phase1c_payload_parts/01 phase1c_payload_parts/02 phase1c_payload_parts/03 phase1c_payload_parts/04 > phase1c_ci_payload.txt
@@ -33,13 +33,20 @@ jobs:
           unzip -t phase1c_ci_subset.zip
           unzip -q phase1c_ci_subset.zip
 
+      - name: Apply Phase 1C.1 delayed formation overrides
+        run: |
+          set -euo pipefail
+          cp phase1c1_overrides/bookingRepository.js phase1c_ci_subset/backend/booking/bookingRepository.js
+          cp phase1c1_overrides/formationService.js phase1c_ci_subset/backend/booking/formationService.js
+          cp phase1c1_overrides/phase1c1_delayed_formation_mysql_smoke.js phase1c_ci_subset/tests/phase1c1_delayed_formation_mysql_smoke.js
+
       - name: Install mysql2 test dependency
         working-directory: phase1c_ci_subset
         run: |
           npm init -y >/dev/null 2>&1
           npm install --no-audit --no-fund mysql2@3.11.5
 
-      - name: Apply frozen schema and run real MySQL booking concurrency smoke
+      - name: Apply frozen schema and run original Phase 1C concurrency regression
         env:
           MYSQL_CONTAINER_ID: ${{ job.services.mysql.id }}
           DB_HOST: 127.0.0.1
@@ -49,24 +56,41 @@ jobs:
           DB_NAME: hubeier_phase1c_smoke
         run: |
           set -euo pipefail
-          docker exec -i "$MYSQL_CONTAINER_ID" mysql -uroot -proot -e "CREATE DATABASE IF NOT EXISTS hubeier_phase1c_smoke CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci;"
+          docker exec -i "$MYSQL_CONTAINER_ID" mysql -uroot -proot -e "DROP DATABASE IF EXISTS hubeier_phase1c_smoke; CREATE DATABASE hubeier_phase1c_smoke CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci;"
           docker exec -i "$MYSQL_CONTAINER_ID" mysql -uroot -proot hubeier_phase1c_smoke < phase1c_ci_subset/database/schema.sql
           (
             cd phase1c_ci_subset
             NODE_PATH="$PWD/node_modules" node tests/phase1c_booking_mysql_smoke.js
           ) | tee phase1c_booking_mysql_smoke.result.txt
 
-      - name: Upload Phase 1C MySQL evidence
+      - name: Run Phase 1C.1 delayed formation smoke on fresh database
+        env:
+          MYSQL_CONTAINER_ID: ${{ job.services.mysql.id }}
+          DB_HOST: 127.0.0.1
+          DB_PORT: 3306
+          DB_USER: root
+          DB_PASSWORD: root
+          DB_NAME: hubeier_phase1c1_smoke
+        run: |
+          set -euo pipefail
+          docker exec -i "$MYSQL_CONTAINER_ID" mysql -uroot -proot -e "DROP DATABASE IF EXISTS hubeier_phase1c1_smoke; CREATE DATABASE hubeier_phase1c1_smoke CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci;"
+          docker exec -i "$MYSQL_CONTAINER_ID" mysql -uroot -proot hubeier_phase1c1_smoke < phase1c_ci_subset/database/schema.sql
+          (
+            cd phase1c_ci_subset
+            DB_NAME=hubeier_phase1c1_smoke NODE_PATH="$PWD/node_modules" node tests/phase1c1_delayed_formation_mysql_smoke.js
+          ) | tee phase1c1_delayed_formation_mysql_smoke.result.txt
+
+      - name: Upload Phase 1C.1 MySQL evidence
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: phase1c-booking-mysql-smoke-evidence
+          name: phase1c1-delayed-formation-mysql-smoke-evidence
           path: |
-            phase1c_ci_payload.txt
-            phase1c_ci_subset.zip
             phase1c_ci_subset/backend/booking/bookingRepository.js
             phase1c_ci_subset/backend/booking/bookingService.js
             phase1c_ci_subset/backend/booking/formationService.js
             phase1c_ci_subset/database/schema.sql
             phase1c_ci_subset/tests/phase1c_booking_mysql_smoke.js
+            phase1c_ci_subset/tests/phase1c1_delayed_formation_mysql_smoke.js
             phase1c_booking_mysql_smoke.result.txt
+            phase1c1_delayed_formation_mysql_smoke.result.txt
