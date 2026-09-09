@@ -33,30 +33,7 @@ jobs:
           unzip -q phase1c_ci_subset.zip
           echo "e9f10294d257d89f41aec9f97999e30a48835383487aedf3a63d5889f12e6d20  phase1d_overlay.zip" | sha256sum -c -
           unzip -oq phase1d_overlay.zip -d phase1c_ci_subset
-          python3 - <<'PY'
-          from pathlib import Path
-          p = Path("phase1c_ci_subset/tests/phase1d_cancellation_mysql_smoke.js")
-          s = p.read_text()
-          old = "function resultCode(settled) { return settled.status === 'rejected' && settled.reason ? settled.reason.code : null; }\n"
-          add = """function resultCode(settled) { return settled.status === 'rejected' && settled.reason ? settled.reason.code : null; }
-function stableStringify(value) {
-  if (Array.isArray(value)) return `[${value.map(stableStringify).join(',')}]`;
-  if (value && typeof value === 'object') {
-    return `{${Object.keys(value).sort().map(key => `${JSON.stringify(key)}:${stableStringify(value[key])}`).join(',')}}`;
-  }
-  return JSON.stringify(value);
-}
-"""
-          if old not in s:
-              raise SystemExit("resultCode patch anchor missing")
-          s = s.replace(old, add, 1)
-          old_cmp = "new Set(hRace.map(x => JSON.stringify(x.value.payload))).size === 1"
-          new_cmp = "new Set(hRace.map(x => stableStringify(x.value.payload))).size === 1"
-          if old_cmp not in s:
-              raise SystemExit("payload comparison patch anchor missing")
-          s = s.replace(old_cmp, new_cmp, 1)
-          p.write_text(s)
-          PY
+          python3 -c "from pathlib import Path; import base64; p=Path('phase1c_ci_subset/tests/phase1d_cancellation_mysql_smoke.js'); s=p.read_text(); a=base64.b64decode('ZnVuY3Rpb24gcmVzdWx0Q29kZShzZXR0bGVkKSB7IHJldHVybiBzZXR0bGVkLnN0YXR1cyA9PT0gJ3JlamVjdGVkJyAmJiBzZXR0bGVkLnJlYXNvbiA/IHNldHRsZWQucmVhc29uLmNvZGUgOiBudWxsOyB9Cg==').decode(); b=base64.b64decode('ZnVuY3Rpb24gcmVzdWx0Q29kZShzZXR0bGVkKSB7IHJldHVybiBzZXR0bGVkLnN0YXR1cyA9PT0gJ3JlamVjdGVkJyAmJiBzZXR0bGVkLnJlYXNvbiA/IHNldHRsZWQucmVhc29uLmNvZGUgOiBudWxsOyB9CmZ1bmN0aW9uIHN0YWJsZVN0cmluZ2lmeSh2YWx1ZSkgewogIGlmIChBcnJheS5pc0FycmF5KHZhbHVlKSkgcmV0dXJuIGBbJHt2YWx1ZS5tYXAoc3RhYmxlU3RyaW5naWZ5KS5qb2luKCcsJyl9XWA7CiAgaWYgKHZhbHVlICYmIHR5cGVvZiB2YWx1ZSA9PT0gJ29iamVjdCcpIHsKICAgIHJldHVybiBgeyR7T2JqZWN0LmtleXModmFsdWUpLnNvcnQoKS5tYXAoa2V5ID0+IGAke0pTT04uc3RyaW5naWZ5KGtleSl9OiR7c3RhYmxlU3RyaW5naWZ5KHZhbHVlW2tleV0pfWApLmpvaW4oJywnKX19YDsKICB9CiAgcmV0dXJuIEpTT04uc3RyaW5naWZ5KHZhbHVlKTsKfQo=').decode(); c=base64.b64decode('bmV3IFNldChoUmFjZS5tYXAoeCA9PiBKU09OLnN0cmluZ2lmeSh4LnZhbHVlLnBheWxvYWQpKSkuc2l6ZSA9PT0gMQ==').decode(); d=base64.b64decode('bmV3IFNldChoUmFjZS5tYXAoeCA9PiBzdGFibGVTdHJpbmdpZnkoeC52YWx1ZS5wYXlsb2FkKSkpLnNpemUgPT09IDE=').decode(); assert s.count(a)==1 and s.count(c)==1; p.write_text(s.replace(a,b,1).replace(c,d,1))"
           echo "09304f856a7d8fa9333eb0c00fa809cccf0e944a11491315fbcd70bb319e1b74  phase1c_ci_subset/tests/phase1d_cancellation_mysql_smoke.js" | sha256sum -c -
           node --check phase1c_ci_subset/backend/booking/cancellationService.js
           node --check phase1c_ci_subset/backend/booking/cancellationRepository.js
