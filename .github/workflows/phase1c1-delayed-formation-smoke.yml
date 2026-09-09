@@ -1,0 +1,59 @@
+name: Phase1C1 Delayed Formation MySQL Smoke
+
+on:
+  push:
+    branches:
+      - phase1c1-delayed-formation-smoke
+
+jobs:
+  delayed-formation-mysql-smoke:
+    runs-on: ubuntu-latest
+    services:
+      mysql:
+        image: mysql:8.0.32
+        env:
+          MYSQL_ROOT_PASSWORD: root
+        ports:
+          - 3306:3306
+        options: >-
+          --health-cmd="mysqladmin ping -h 127.0.0.1 -uroot -proot"
+          --health-interval=5s
+          --health-timeout=5s
+          --health-retries=30
+    steps:
+      - uses: actions/checkout@v4
+      - name: Extract Phase 1C.1 subset
+        run: unzip -q phase1c1_ci_subset.zip
+      - name: Install mysql2
+        working-directory: phase1c1_ci_subset
+        run: |
+          npm init -y >/dev/null 2>&1
+          npm install --no-audit --no-fund mysql2@3.11.5
+      - name: Apply frozen schema and run real MySQL delayed formation smoke
+        env:
+          MYSQL_CONTAINER_ID: ${{ job.services.mysql.id }}
+          DB_HOST: 127.0.0.1
+          DB_PORT: 3306
+          DB_USER: root
+          DB_PASSWORD: root
+          DB_NAME: hubeier_phase1c1_smoke
+        run: |
+          set -o pipefail
+          docker exec -i "$MYSQL_CONTAINER_ID" mysql -uroot -proot -e "CREATE DATABASE IF NOT EXISTS hubeier_phase1c1_smoke CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci;"
+          docker exec -i "$MYSQL_CONTAINER_ID" mysql -uroot -proot hubeier_phase1c1_smoke < phase1c1_ci_subset/database/schema.sql
+          (
+            cd phase1c1_ci_subset
+            NODE_PATH="$PWD/node_modules" node tests/phase1c_booking_mysql_smoke.js
+          ) | tee phase1c1_booking_mysql_smoke.result.txt
+      - name: Upload evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: phase1c1-delayed-formation-mysql-smoke-evidence
+          path: |
+            phase1c1_ci_subset/backend/booking/bookingRepository.js
+            phase1c1_ci_subset/backend/booking/bookingService.js
+            phase1c1_ci_subset/backend/booking/formationService.js
+            phase1c1_ci_subset/database/schema.sql
+            phase1c1_ci_subset/tests/phase1c_booking_mysql_smoke.js
+            phase1c1_booking_mysql_smoke.result.txt
