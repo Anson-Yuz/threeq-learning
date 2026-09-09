@@ -1,0 +1,78 @@
+name: Phase1D Cancellation MySQL Smoke
+
+on:
+  push:
+    branches:
+      - phase1d-cancellation-mysql-smoke
+
+jobs:
+  cancellation-mysql-smoke:
+    runs-on: ubuntu-latest
+    services:
+      mysql:
+        image: mysql:8.0.32
+        env:
+          MYSQL_ROOT_PASSWORD: root
+        ports:
+          - 3306:3306
+        options: >-
+          --health-cmd="mysqladmin ping -h 127.0.0.1 -uroot -proot"
+          --health-interval=5s
+          --health-timeout=5s
+          --health-retries=30
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Reconstruct Phase 1C base and overlay exact Phase 1D code
+        run: |
+          set -euo pipefail
+          cat phase1c_payload_parts/00 phase1c_payload_parts/01 phase1c_payload_parts/02 phase1c_payload_parts/03 phase1c_payload_parts/04 > phase1c_ci_payload.txt
+          echo "768f389856920f3218395143311ed6683341aba30fa9804fe656ab21b5a974e2  phase1c_ci_payload.txt" | sha256sum -c -
+          base64 -d phase1c_ci_payload.txt > phase1c_ci_subset.zip
+          echo "a50769d6b11a684279a4f3739b4e8b11dd22b1f230fa28bf513f8ef36e491fb4  phase1c_ci_subset.zip" | sha256sum -c -
+          unzip -q phase1c_ci_subset.zip
+          echo "e9f10294d257d89f41aec9f97999e30a48835383487aedf3a63d5889f12e6d20  phase1d_overlay.zip" | sha256sum -c -
+          unzip -oq phase1d_overlay.zip -d phase1c_ci_subset
+          node --check phase1c_ci_subset/backend/booking/cancellationService.js
+          node --check phase1c_ci_subset/backend/booking/cancellationRepository.js
+          node --check phase1c_ci_subset/tests/phase1d_cancellation_mysql_smoke.js
+
+      - name: Install mysql2
+        working-directory: phase1c_ci_subset
+        run: |
+          npm init -y >/dev/null 2>&1
+          npm install --no-audit --no-fund mysql2@3.11.5
+
+      - name: Run real MySQL Phase 1D cancellation concurrency smoke
+        env:
+          MYSQL_CONTAINER_ID: ${{ job.services.mysql.id }}
+          DB_HOST: 127.0.0.1
+          DB_PORT: 3306
+          DB_USER: root
+          DB_PASSWORD: root
+          DB_NAME: hubeier_phase1d_smoke
+        run: |
+          set -euo pipefail
+          docker exec -i "$MYSQL_CONTAINER_ID" mysql -uroot -proot -e "CREATE DATABASE IF NOT EXISTS hubeier_phase1d_smoke CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci;"
+          docker exec -i "$MYSQL_CONTAINER_ID" mysql -uroot -proot hubeier_phase1d_smoke < phase1c_ci_subset/database/schema.sql
+          (
+            cd phase1c_ci_subset
+            NODE_PATH="$PWD/node_modules" node tests/phase1d_cancellation_mysql_smoke.js
+          ) | tee phase1d_cancellation_mysql_smoke.result.txt
+
+      - name: Upload Phase 1D MySQL evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: phase1d-cancellation-mysql-smoke-evidence
+          path: |
+            phase1d_overlay.zip
+            phase1c_ci_subset/backend/booking/bookingRepository.js
+            phase1c_ci_subset/backend/booking/bookingService.js
+            phase1c_ci_subset/backend/booking/formationService.js
+            phase1c_ci_subset/backend/booking/cancellationRepository.js
+            phase1c_ci_subset/backend/booking/cancellationService.js
+            phase1c_ci_subset/backend/booking/errors.js
+            phase1c_ci_subset/database/schema.sql
+            phase1c_ci_subset/tests/phase1d_cancellation_mysql_smoke.js
+            phase1d_cancellation_mysql_smoke.result.txt
