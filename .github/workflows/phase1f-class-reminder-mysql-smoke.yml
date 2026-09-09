@@ -23,23 +23,32 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Extract exact Phase 1F CI subset
+      - name: Reconstruct baseline and overlay reminder code
         run: |
           set -euo pipefail
-          sha256sum phase1f_ci_subset.zip
-          mkdir phase1f_ci_subset
-          unzip -q phase1f_ci_subset.zip -d phase1f_ci_subset
-          node --check phase1f_ci_subset/backend/jobs/classReminderWorker.js
-          node --check phase1f_ci_subset/backend/booking/classReminderRepository.js
-          node --check phase1f_ci_subset/tests/phase1f_class_reminder_mysql_smoke.js
+          mkdir -p phase1c_payload_parts
+          git fetch --depth=1 origin phase1d-cancellation-mysql-smoke
+          for p in 00 01 02 03 04; do git show FETCH_HEAD:phase1c_payload_parts/$p > phase1c_payload_parts/$p; done
+          git show FETCH_HEAD:phase1d_overlay.zip > phase1d_overlay.zip
+          cat phase1c_payload_parts/00 phase1c_payload_parts/01 phase1c_payload_parts/02 phase1c_payload_parts/03 phase1c_payload_parts/04 > phase1c_ci_payload.txt
+          base64 -d phase1c_ci_payload.txt > phase1c_ci_subset.zip
+          unzip -q phase1c_ci_subset.zip
+          unzip -oq phase1d_overlay.zip -d phase1c_ci_subset
+          git fetch --depth=1 origin phase1e-evidence-base
+          git show FETCH_HEAD:phase1e_overlay.zip > phase1e_overlay.zip
+          unzip -oq phase1e_overlay.zip -d phase1c_ci_subset
+          unzip -oq phase1f_overlay_small.zip -d phase1c_ci_subset
+          node --check phase1c_ci_subset/backend/jobs/classReminderWorker.js
+          node --check phase1c_ci_subset/backend/booking/classReminderRepository.js
+          node --check phase1c_ci_subset/tests/phase1f_class_reminder_mysql_smoke.js
 
       - name: Install mysql2
-        working-directory: phase1f_ci_subset
+        working-directory: phase1c_ci_subset
         run: |
           npm init -y >/dev/null 2>&1
           npm install --no-audit --no-fund mysql2@3.11.5
 
-      - name: Apply frozen schema and run real MySQL class reminder smoke
+      - name: Run real MySQL class reminder smoke
         env:
           MYSQL_CONTAINER_ID: ${{ job.services.mysql.id }}
           DB_HOST: 127.0.0.1
@@ -50,27 +59,24 @@ jobs:
         run: |
           set -euo pipefail
           docker exec -i "$MYSQL_CONTAINER_ID" mysql -uroot -proot -e "CREATE DATABASE IF NOT EXISTS hubeier_phase1f_smoke CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci;"
-          docker exec -i "$MYSQL_CONTAINER_ID" mysql -uroot -proot hubeier_phase1f_smoke < phase1f_ci_subset/database/schema.sql
-          (
-            cd phase1f_ci_subset
-            NODE_PATH="$PWD/node_modules" node tests/phase1f_class_reminder_mysql_smoke.js
-          ) | tee phase1f_class_reminder_mysql_smoke.result.txt
+          docker exec -i "$MYSQL_CONTAINER_ID" mysql -uroot -proot hubeier_phase1f_smoke < phase1c_ci_subset/database/schema.sql
+          (cd phase1c_ci_subset && NODE_PATH="$PWD/node_modules" node tests/phase1f_class_reminder_mysql_smoke.js) | tee phase1f_class_reminder_mysql_smoke.result.txt
 
-      - name: Upload Phase 1F MySQL evidence
+      - name: Upload evidence
         if: always()
         uses: actions/upload-artifact@v4
         with:
           name: phase1f-class-reminder-mysql-smoke-evidence
           path: |
-            phase1f_ci_subset.zip
-            phase1f_ci_subset/backend/booking/classReminderRepository.js
-            phase1f_ci_subset/backend/jobs/classReminderWorker.js
-            phase1f_ci_subset/backend/jobs/classReminderJob.js
-            phase1f_ci_subset/backend/jobs/runClassReminderJob.js
-            phase1f_ci_subset/backend/bootstrap/createClassReminderWorkerModule.js
-            phase1f_ci_subset/backend/booking/formationService.js
-            phase1f_ci_subset/backend/jobs/formationWorker.js
-            phase1f_ci_subset/backend/booking/bookingService.js
-            phase1f_ci_subset/database/schema.sql
-            phase1f_ci_subset/tests/phase1f_class_reminder_mysql_smoke.js
+            phase1f_overlay_small.zip
+            phase1c_ci_subset/backend/booking/classReminderRepository.js
+            phase1c_ci_subset/backend/jobs/classReminderWorker.js
+            phase1c_ci_subset/backend/jobs/classReminderJob.js
+            phase1c_ci_subset/backend/jobs/runClassReminderJob.js
+            phase1c_ci_subset/backend/bootstrap/createClassReminderWorkerModule.js
+            phase1c_ci_subset/backend/booking/formationService.js
+            phase1c_ci_subset/backend/jobs/formationWorker.js
+            phase1c_ci_subset/backend/booking/bookingService.js
+            phase1c_ci_subset/database/schema.sql
+            phase1c_ci_subset/tests/phase1f_class_reminder_mysql_smoke.js
             phase1f_class_reminder_mysql_smoke.result.txt
