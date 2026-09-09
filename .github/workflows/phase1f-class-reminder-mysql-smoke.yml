@@ -1,0 +1,76 @@
+name: Phase1F Class Reminder MySQL Smoke
+
+on:
+  push:
+    branches:
+      - phase1f-class-reminder-mysql-smoke
+
+jobs:
+  class-reminder-mysql-smoke:
+    runs-on: ubuntu-latest
+    services:
+      mysql:
+        image: mysql:8.0.32
+        env:
+          MYSQL_ROOT_PASSWORD: root
+        ports:
+          - 3306:3306
+        options: >-
+          --health-cmd="mysqladmin ping -h 127.0.0.1 -uroot -proot"
+          --health-interval=5s
+          --health-timeout=5s
+          --health-retries=30
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Extract exact Phase 1F CI subset
+        run: |
+          set -euo pipefail
+          echo "850bb15fed06dcef1c79165fb704daf85c2ed3a00660b012a9f2675a5a56f2b0  phase1f_ci_subset.zip" | sha256sum -c -
+          mkdir phase1f_ci_subset
+          unzip -q phase1f_ci_subset.zip -d phase1f_ci_subset
+          node --check phase1f_ci_subset/backend/jobs/classReminderWorker.js
+          node --check phase1f_ci_subset/backend/booking/classReminderRepository.js
+          node --check phase1f_ci_subset/tests/phase1f_class_reminder_mysql_smoke.js
+
+      - name: Install mysql2
+        working-directory: phase1f_ci_subset
+        run: |
+          npm init -y >/dev/null 2>&1
+          npm install --no-audit --no-fund mysql2@3.11.5
+
+      - name: Apply frozen schema and run real MySQL class reminder smoke
+        env:
+          MYSQL_CONTAINER_ID: ${{ job.services.mysql.id }}
+          DB_HOST: 127.0.0.1
+          DB_PORT: 3306
+          DB_USER: root
+          DB_PASSWORD: root
+          DB_NAME: hubeier_phase1f_smoke
+        run: |
+          set -euo pipefail
+          docker exec -i "$MYSQL_CONTAINER_ID" mysql -uroot -proot -e "CREATE DATABASE IF NOT EXISTS hubeier_phase1f_smoke CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci;"
+          docker exec -i "$MYSQL_CONTAINER_ID" mysql -uroot -proot hubeier_phase1f_smoke < phase1f_ci_subset/database/schema.sql
+          (
+            cd phase1f_ci_subset
+            NODE_PATH="$PWD/node_modules" node tests/phase1f_class_reminder_mysql_smoke.js
+          ) | tee phase1f_class_reminder_mysql_smoke.result.txt
+
+      - name: Upload Phase 1F MySQL evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: phase1f-class-reminder-mysql-smoke-evidence
+          path: |
+            phase1f_ci_subset.zip
+            phase1f_ci_subset/backend/booking/classReminderRepository.js
+            phase1f_ci_subset/backend/jobs/classReminderWorker.js
+            phase1f_ci_subset/backend/jobs/classReminderJob.js
+            phase1f_ci_subset/backend/jobs/runClassReminderJob.js
+            phase1f_ci_subset/backend/bootstrap/createClassReminderWorkerModule.js
+            phase1f_ci_subset/backend/booking/formationService.js
+            phase1f_ci_subset/backend/jobs/formationWorker.js
+            phase1f_ci_subset/backend/booking/bookingService.js
+            phase1f_ci_subset/database/schema.sql
+            phase1f_ci_subset/tests/phase1f_class_reminder_mysql_smoke.js
+            phase1f_class_reminder_mysql_smoke.result.txt
